@@ -1,3 +1,10 @@
+"""N-panel UI for the Vertex Measure addon (Measure tab).
+
+Two panels:
+* ``VM_PT_Main``   — measurement list with add/remove controls
+* ``VM_PT_Config`` — collapsible display settings (sub-panel of Main)
+"""
+
 import bpy
 from bpy.types import Panel
 
@@ -5,13 +12,16 @@ from .preferences import get_prefs, format_distance, _draw_config
 
 
 class VM_PT_Main(Panel):
+    """Main Vertex Measure panel listing all measurements across all scene objects."""
+
     bl_label = "Vertex Measure"
     bl_idname = "VM_PT_Main"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "Measure"
 
-    def draw(self, context):
+    def draw(self, context: bpy.types.Context) -> None:
+        """Draw the Add Measurement button and per-object measurement lists."""
         layout = self.layout
 
         # Add Measurement button — only active in Edit Mode with 2 verts selected
@@ -89,6 +99,8 @@ class VM_PT_Main(Panel):
 
 
 class VM_PT_Config(Panel):
+    """Collapsible sub-panel for Vertex Measure display settings."""
+
     bl_label = "Display Settings"
     bl_idname = "VM_PT_Config"
     bl_space_type = 'VIEW_3D'
@@ -97,7 +109,8 @@ class VM_PT_Config(Panel):
     bl_parent_id = "VM_PT_Main"
     bl_options = {'DEFAULT_CLOSED'}
 
-    def draw(self, context):
+    def draw(self, context: bpy.types.Context) -> None:
+        """Render the shared display-settings layout from preferences."""
         try:
             prefs = get_prefs(context)
         except (KeyError, AttributeError):
@@ -109,11 +122,13 @@ class VM_PT_Config(Panel):
 CLASSES = [VM_PT_Main, VM_PT_Config]
 
 
-def register():
+def register() -> None:
+    """Register all Vertex Measure panels."""
     for cls in CLASSES:
         bpy.utils.register_class(cls)
 
 
-def unregister():
+def unregister() -> None:
+    """Unregister all Vertex Measure panels."""
     for cls in reversed(CLASSES):
         bpy.utils.unregister_class(cls)

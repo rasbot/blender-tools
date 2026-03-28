@@ -1,8 +1,12 @@
+"""N-panel UI for the Peg Cutter tool (Mesh Tools tab)."""
+
 import bpy
 from bpy.types import Panel
 
 
 class PC_PT_PegCutter(Panel):
+    """Sidebar panel for configuring and executing the Peg Cutter."""
+
     bl_label       = "Peg Cutter"
     bl_idname      = "PC_PT_PegCutter"
     bl_space_type  = 'VIEW_3D'
@@ -10,7 +14,8 @@ class PC_PT_PegCutter(Panel):
     bl_category    = "Mesh Tools"
     bl_options     = {'DEFAULT_CLOSED'}
 
-    def draw(self, context):
+    def draw(self, context: bpy.types.Context) -> None:
+        """Draw shape selector, dimensions, position, clearance, targets, and cut button."""
         layout = self.layout
         props  = context.scene.pc_props
         shape  = props.peg_shape
@@ -118,11 +123,13 @@ class PC_PT_PegCutter(Panel):
 CLASSES = [PC_PT_PegCutter]
 
 
-def register():
+def register() -> None:
+    """Register the Peg Cutter panel."""
     for cls in CLASSES:
         bpy.utils.register_class(cls)
 
 
-def unregister():
+def unregister() -> None:
+    """Unregister the Peg Cutter panel."""
     for cls in reversed(CLASSES):
         bpy.utils.unregister_class(cls)

@@ -1,12 +1,25 @@
+"""Viewport draw callback for the Plane Slicer preview overlay.
+
+Draws a semi-transparent filled quad, a solid border, and a short normal
+arrow at the current slice plane position when ``ps_props.show_plane`` is
+enabled.  The handler is registered at ``POST_VIEW`` so it renders in 3-D
+space before the depth buffer is restored.
+"""
+
 import bpy
 import gpu
 from gpu_extras.batch import batch_for_shader
 from mathutils import Vector, Euler
 
-_handles = []
+_handles: list[object] = []
 
 
-def draw_slicer_plane():
+def draw_slicer_plane() -> None:
+    """Draw the slice plane preview in all active VIEW_3D areas.
+
+    Reads ``context.scene.ps_props`` each frame; returns immediately when
+    ``show_plane`` is False or when the property group is unavailable.
+    """
     context = bpy.context
     if not context or not context.scene:
         return
@@ -68,7 +81,7 @@ def draw_slicer_plane():
         shader_line.uniform_float("viewportSize", (region.width, region.height))
     batch_border.draw(shader_line)
 
-    # --- Normal arrow (short line from center along local Z) ---
+    # --- Normal arrow (short line from centre along local Z) ---
     normal = (rot_mat @ Vector((0.0, 0.0, 1.0))).normalized()
     arrow_tip = origin + normal * (half * 0.35)
     batch_arrow = batch_for_shader(shader_line, 'LINES', {"pos": [origin, arrow_tip]})
@@ -84,7 +97,8 @@ def draw_slicer_plane():
     gpu.state.face_culling_set('NONE')
 
 
-def register():
+def register() -> None:
+    """Add the slicer plane draw handler to SpaceView3D."""
     _handles.append(
         bpy.types.SpaceView3D.draw_handler_add(
             draw_slicer_plane, (), 'WINDOW', 'POST_VIEW'
@@ -92,7 +106,8 @@ def register():
     )
 
 
-def unregister():
+def unregister() -> None:
+    """Remove the slicer plane draw handler from SpaceView3D."""
     for h in _handles:
         bpy.types.SpaceView3D.draw_handler_remove(h, 'WINDOW')
     _handles.clear()

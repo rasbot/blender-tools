@@ -1,15 +1,25 @@
+"""Scene-level properties for the Plane Slicer tool."""
+
 import bpy
 from bpy.props import FloatVectorProperty, FloatProperty, BoolProperty, PointerProperty
 from bpy.types import PropertyGroup
 
 
-def _redraw(self, context):
+def _redraw(self: bpy.types.PropertyGroup, context: bpy.types.Context) -> None:
+    """Tag all VIEW_3D areas for redraw when a slicer property changes."""
     for area in context.screen.areas:
         if area.type == 'VIEW_3D':
             area.tag_redraw()
 
 
 class PlaneSlicerProps(PropertyGroup):
+    """Scene-level settings for the Plane Slicer tool.
+
+    The slice plane is fully described by an origin point and a rotation
+    (whose local Z axis is the plane normal).  ``show_plane`` gates the
+    viewport preview draw callback so the overlay is off by default.
+    """
+
     plane_origin: FloatVectorProperty(
         name="Origin",
         description="A point the slice plane passes through",
@@ -51,12 +61,14 @@ class PlaneSlicerProps(PropertyGroup):
     )
 
 
-def register():
+def register() -> None:
+    """Register PlaneSlicerProps and attach it to bpy.types.Scene."""
     bpy.utils.register_class(PlaneSlicerProps)
     bpy.types.Scene.ps_props = PointerProperty(type=PlaneSlicerProps)
 
 
-def unregister():
+def unregister() -> None:
+    """Remove the scene attribute and unregister PlaneSlicerProps."""
     if hasattr(bpy.types.Scene, 'ps_props'):
         del bpy.types.Scene.ps_props
     bpy.utils.unregister_class(PlaneSlicerProps)

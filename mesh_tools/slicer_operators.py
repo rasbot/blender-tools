@@ -1,18 +1,64 @@
+"""Operators for the Plane Slicer tool.
+
+Provides five operators:
+* ``PS_OT_SliceMesh``    — duplicate active mesh and bisect both halves
+* ``PS_OT_CenterPlane``  — move plane origin to active object's bbox centre
+* ``PS_OT_AlignToAxis``  — snap plane orientation to a world axis
+* ``PS_OT_AlignToView``  — orient plane to face the current viewport camera
+* ``PS_OT_PlaceAtCursor`` — move plane origin to the 3-D cursor
+"""
+
 import bpy
 import math
 from bpy.props import EnumProperty
 from mathutils import Vector, Euler, Matrix
 
 
-def _plane_from_props(props):
-    """Return (origin: Vector, normal: Vector) in world space from scene ps_props."""
+def _plane_from_props(props: bpy.types.PropertyGroup) -> tuple[Vector, Vector]:
+    """Derive world-space (origin, normal) from ``ps_props``.
+
+    The plane normal is the local Z axis rotated by ``plane_rotation``.
+
+    Parameters
+    ----------
+    props:
+        A ``PlaneSlicerProps`` instance from ``context.scene.ps_props``.
+
+    Returns
+    -------
+    tuple[Vector, Vector]
+        ``(origin, normal)`` both in world space.
+    """
     rot = Euler(tuple(props.plane_rotation), 'XYZ')
     normal = (rot.to_matrix() @ Vector((0.0, 0.0, 1.0))).normalized()
     return Vector(props.plane_origin), normal
 
 
-def _bisect_object(obj, plane_co, plane_no, fill_cut, clear_inner, clear_outer):
-    """Enter edit mode on obj, bisect it, and return to object mode."""
+def _bisect_object(
+    obj: bpy.types.Object,
+    plane_co: Vector,
+    plane_no: Vector,
+    fill_cut: bool,
+    clear_inner: bool,
+    clear_outer: bool,
+) -> None:
+    """Enter Edit Mode on *obj*, bisect it with the given plane, then return to Object Mode.
+
+    Parameters
+    ----------
+    obj:
+        The mesh object to bisect.
+    plane_co:
+        A world-space point on the cutting plane.
+    plane_no:
+        The world-space normal of the cutting plane.
+    fill_cut:
+        Whether to fill the cut boundary with a face.
+    clear_inner:
+        Remove geometry on the negative-normal side of the plane.
+    clear_outer:
+        Remove geometry on the positive-normal side of the plane.
+    """
     bpy.ops.object.select_all(action='DESELECT')
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
@@ -29,6 +75,12 @@ def _bisect_object(obj, plane_co, plane_no, fill_cut, clear_inner, clear_outer):
 
 
 class PS_OT_SliceMesh(bpy.types.Operator):
+    """Slice the active mesh into two objects along the defined plane.
+
+    The original object is kept as ``<name>_A`` (positive-normal side) and a
+    duplicate is kept as ``<name>_B`` (negative-normal side).
+    """
+
     bl_idname = "ps.slice_mesh"
     bl_label = "Slice Mesh"
     bl_description = (
@@ -38,14 +90,16 @@ class PS_OT_SliceMesh(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
-    def poll(cls, context):
+    def poll(cls, context: bpy.types.Context) -> bool:
+        """Require an active mesh object in Object Mode."""
         return (
             context.active_object is not None
             and context.active_object.type == 'MESH'
             and context.mode == 'OBJECT'
         )
 
-    def execute(self, context):
+    def execute(self, context: bpy.types.Context) -> set[str]:
+        """Duplicate the active mesh and bisect both halves."""
         obj = context.active_object
         props = context.scene.ps_props
         plane_co, plane_no = _plane_from_props(props)
@@ -80,6 +134,8 @@ class PS_OT_SliceMesh(bpy.types.Operator):
 
 
 class PS_OT_CenterPlane(bpy.types.Operator):
+    """Move the slice plane origin to the active object's bounding-box centre."""
+
     bl_idname = "ps.center_plane"
     bl_label = "Center on Active"
     bl_description = (
@@ -89,13 +145,15 @@ class PS_OT_CenterPlane(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
-    def poll(cls, context):
+    def poll(cls, context: bpy.types.Context) -> bool:
+        """Require an active mesh object."""
         return (
             context.active_object is not None
             and context.active_object.type == 'MESH'
         )
 
-    def execute(self, context):
+    def execute(self, context: bpy.types.Context) -> set[str]:
+        """Set plane origin and display size from the active object's bbox."""
         obj = context.active_object
         world_corners = [obj.matrix_world @ Vector(c) for c in obj.bound_box]
 
@@ -116,6 +174,8 @@ class PS_OT_CenterPlane(bpy.types.Operator):
 
 
 class PS_OT_AlignToAxis(bpy.types.Operator):
+    """Snap the slice plane orientation to a world axis-aligned plane."""
+
     bl_idname = "ps.align_to_axis"
     bl_label = "Align to Axis"
     bl_description = "Snap the slice plane to a world axis-aligned orientation"
@@ -131,7 +191,8 @@ class PS_OT_AlignToAxis(bpy.types.Operator):
         default='XY',
     )
 
-    def execute(self, context):
+    def execute(self, context: bpy.types.Context) -> set[str]:
+        """Set plane_rotation to match the requested world plane."""
         props = context.scene.ps_props
         if self.axis == 'XY':
             props.plane_rotation = (0.0, 0.0, 0.0)
@@ -143,20 +204,24 @@ class PS_OT_AlignToAxis(bpy.types.Operator):
 
 
 class PS_OT_AlignToView(bpy.types.Operator):
+    """Orient the slice plane so its normal faces the current viewport camera."""
+
     bl_idname = "ps.align_to_view"
     bl_label = "Align to View"
     bl_description = "Orient the slice plane to face the current viewport camera"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
-    def poll(cls, context):
+    def poll(cls, context: bpy.types.Context) -> bool:
+        """Require an active VIEW_3D area with region data."""
         return (
             context.area is not None
             and context.area.type == 'VIEW_3D'
             and context.space_data is not None
         )
 
-    def execute(self, context):
+    def execute(self, context: bpy.types.Context) -> set[str]:
+        """Derive plane rotation from the current viewport's view matrix."""
         rv3d = context.space_data.region_3d
 
         # view_rotation rotates from view space to world space.
@@ -180,12 +245,15 @@ class PS_OT_AlignToView(bpy.types.Operator):
 
 
 class PS_OT_PlaceAtCursor(bpy.types.Operator):
+    """Move the slice plane origin to the 3-D cursor."""
+
     bl_idname = "ps.place_at_cursor"
     bl_label = "Place at Cursor"
     bl_description = "Move the slice plane origin to the 3D cursor"
     bl_options = {'REGISTER', 'UNDO'}
 
-    def execute(self, context):
+    def execute(self, context: bpy.types.Context) -> set[str]:
+        """Copy the 3-D cursor location into plane_origin."""
         context.scene.ps_props.plane_origin = context.scene.cursor.location
         return {'FINISHED'}
 
@@ -193,11 +261,13 @@ class PS_OT_PlaceAtCursor(bpy.types.Operator):
 CLASSES = [PS_OT_SliceMesh, PS_OT_CenterPlane, PS_OT_AlignToAxis, PS_OT_AlignToView, PS_OT_PlaceAtCursor]
 
 
-def register():
+def register() -> None:
+    """Register all Plane Slicer operators."""
     for cls in CLASSES:
         bpy.utils.register_class(cls)
 
 
-def unregister():
+def unregister() -> None:
+    """Unregister all Plane Slicer operators."""
     for cls in reversed(CLASSES):
         bpy.utils.unregister_class(cls)

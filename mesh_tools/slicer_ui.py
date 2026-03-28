@@ -1,8 +1,12 @@
+"""N-panel UI for the Plane Slicer tool (Mesh Tools tab)."""
+
 import bpy
 from bpy.types import Panel
 
 
 class PS_PT_PlaneSlicer(Panel):
+    """Sidebar panel for configuring and executing the Plane Slicer."""
+
     bl_label      = "Plane Slicer"
     bl_idname     = "PS_PT_PlaneSlicer"
     bl_space_type = 'VIEW_3D'
@@ -10,7 +14,8 @@ class PS_PT_PlaneSlicer(Panel):
     bl_category   = "Mesh Tools"
     bl_options    = {'DEFAULT_CLOSED'}
 
-    def draw(self, context):
+    def draw(self, context: bpy.types.Context) -> None:
+        """Draw plane controls, preview settings, and the Slice button."""
         layout = self.layout
         props  = context.scene.ps_props
         obj    = context.active_object
@@ -82,11 +87,13 @@ class PS_PT_PlaneSlicer(Panel):
 CLASSES = [PS_PT_PlaneSlicer]
 
 
-def register():
+def register() -> None:
+    """Register the Plane Slicer panel."""
     for cls in CLASSES:
         bpy.utils.register_class(cls)
 
 
-def unregister():
+def unregister() -> None:
+    """Unregister the Plane Slicer panel."""
     for cls in reversed(CLASSES):
         bpy.utils.unregister_class(cls)

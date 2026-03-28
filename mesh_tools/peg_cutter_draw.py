@@ -1,16 +1,45 @@
+"""Viewport draw callback for the Peg Cutter preview overlay.
+
+Draws a semi-transparent peg fill and a wireframe cutter outline in the
+viewport when ``pc_props.show_preview`` is enabled.  Both shapes are
+rendered in 3-D space (``POST_VIEW``) with alpha blending and no depth
+testing so they are always visible regardless of other geometry.
+"""
+
 import math
 import bpy
 import gpu
 from gpu_extras.batch import batch_for_shader
-from mathutils import Vector, Euler
+from mathutils import Vector, Euler, Matrix
 
-_handles = []
+_handles: list[object] = []
 
 
 # ── Geometry helpers ──────────────────────────────────────────────────────────
 
-def _box_tris(origin, rot_mat, hx, hy, hz):
-    """Fill triangles for a box with half-extents hx/hy/hz at origin."""
+def _box_tris(
+    origin: Vector,
+    rot_mat: Matrix,
+    hx: float,
+    hy: float,
+    hz: float,
+) -> list[Vector]:
+    """Return a flat list of world-space triangle vertices for a box.
+
+    Parameters
+    ----------
+    origin:
+        World-space centre of the box.
+    rot_mat:
+        3×3 rotation matrix applied to local-space corners.
+    hx, hy, hz:
+        Half-extents along each axis in scene units.
+
+    Returns
+    -------
+    list[Vector]
+        36 world-space vertices (12 triangles, 6 faces × 2 tris).
+    """
     corners_local = [
         Vector((-hx, -hy, -hz)), Vector(( hx, -hy, -hz)),
         Vector(( hx,  hy, -hz)), Vector((-hx,  hy, -hz)),
@@ -33,8 +62,29 @@ def _box_tris(origin, rot_mat, hx, hy, hz):
     return tris
 
 
-def _box_lines(origin, rot_mat, hx, hy, hz):
-    """Wire edges for a box with half-extents hx/hy/hz."""
+def _box_lines(
+    origin: Vector,
+    rot_mat: Matrix,
+    hx: float,
+    hy: float,
+    hz: float,
+) -> list[Vector]:
+    """Return world-space line-segment vertex pairs for a box wireframe.
+
+    Parameters
+    ----------
+    origin:
+        World-space centre of the box.
+    rot_mat:
+        3×3 rotation matrix applied to local-space corners.
+    hx, hy, hz:
+        Half-extents along each axis in scene units.
+
+    Returns
+    -------
+    list[Vector]
+        24 world-space vertices (12 edges × 2 endpoints).
+    """
     corners_local = [
         Vector((-hx, -hy, -hz)), Vector(( hx, -hy, -hz)),
         Vector(( hx,  hy, -hz)), Vector((-hx,  hy, -hz)),
@@ -50,15 +100,40 @@ def _box_lines(origin, rot_mat, hx, hy, hz):
     return [v for pair in pairs for v in pair]
 
 
-def _cylinder_tris(origin, rot_mat, radius, hh, segments):
-    """Fill triangles for a cylinder with given radius and half-height hh."""
+def _cylinder_tris(
+    origin: Vector,
+    rot_mat: Matrix,
+    radius: float,
+    hh: float,
+    segments: int,
+) -> list[Vector]:
+    """Return world-space triangle vertices for a closed cylinder.
+
+    Parameters
+    ----------
+    origin:
+        World-space centre of the cylinder.
+    rot_mat:
+        3×3 rotation matrix applied to local-space vertices.
+    radius:
+        Cylinder radius in scene units.
+    hh:
+        Half-height in scene units.
+    segments:
+        Number of lateral faces.
+
+    Returns
+    -------
+    list[Vector]
+        World-space vertices for all triangles (caps + body quads).
+    """
     angles = [2 * math.pi * i / segments for i in range(segments)]
     bot = [Vector((math.cos(a) * radius, math.sin(a) * radius, -hh)) for a in angles]
     top = [Vector((math.cos(a) * radius, math.sin(a) * radius,  hh)) for a in angles]
     bot_c = Vector((0.0, 0.0, -hh))
     top_c = Vector((0.0, 0.0,  hh))
 
-    def w(v):
+    def w(v: Vector) -> Vector:
         return origin + rot_mat @ v
 
     tris = []
@@ -71,8 +146,35 @@ def _cylinder_tris(origin, rot_mat, radius, hh, segments):
     return tris
 
 
-def _cylinder_lines(origin, rot_mat, radius, hh, segments):
-    """Wire circles + verticals for a cylinder."""
+def _cylinder_lines(
+    origin: Vector,
+    rot_mat: Matrix,
+    radius: float,
+    hh: float,
+    segments: int,
+) -> list[Vector]:
+    """Return world-space line-segment vertices for a cylinder wireframe.
+
+    Draws top and bottom circles plus one vertical edge every ~45°.
+
+    Parameters
+    ----------
+    origin:
+        World-space centre of the cylinder.
+    rot_mat:
+        3×3 rotation matrix applied to local-space vertices.
+    radius:
+        Cylinder radius in scene units.
+    hh:
+        Half-height in scene units.
+    segments:
+        Number of lateral divisions.
+
+    Returns
+    -------
+    list[Vector]
+        World-space line endpoint pairs.
+    """
     angles = [2 * math.pi * i / segments for i in range(segments)]
     bot = [origin + rot_mat @ Vector((math.cos(a)*radius, math.sin(a)*radius, -hh)) for a in angles]
     top = [origin + rot_mat @ Vector((math.cos(a)*radius, math.sin(a)*radius,  hh)) for a in angles]
@@ -87,8 +189,19 @@ def _cylinder_lines(origin, rot_mat, radius, hh, segments):
     return lines
 
 
-def _bbox_half_extents(obj):
-    """Return (hx, hy, hz, local_centre) from obj.bound_box (local space)."""
+def _bbox_half_extents(obj: bpy.types.Object) -> tuple[float, float, float, Vector]:
+    """Compute half-extents and local centre from an object's bounding box.
+
+    Parameters
+    ----------
+    obj:
+        The mesh object to measure (uses ``obj.bound_box``, local space).
+
+    Returns
+    -------
+    tuple[float, float, float, Vector]
+        ``(hx, hy, hz, local_centre)`` where half-extents are in local units.
+    """
     corners = [Vector(c) for c in obj.bound_box]
     xs = [c.x for c in corners]; ys = [c.y for c in corners]; zs = [c.z for c in corners]
     hx = (max(xs) - min(xs)) / 2.0
@@ -100,7 +213,14 @@ def _bbox_half_extents(obj):
 
 # ── Draw callback ─────────────────────────────────────────────────────────────
 
-def draw_peg_preview():
+def draw_peg_preview() -> None:
+    """Draw the peg fill and cutter wireframe overlay in all VIEW_3D areas.
+
+    Reads ``context.scene.pc_props`` each frame; returns immediately when
+    ``show_preview`` is False or the property group is unavailable.
+    The peg is rendered as a semi-transparent solid; the cutter (peg +
+    clearance) as a coloured wireframe.
+    """
     context = bpy.context
     if not context or not context.scene:
         return
@@ -183,7 +303,8 @@ def draw_peg_preview():
     gpu.state.face_culling_set('NONE')
 
 
-def register():
+def register() -> None:
+    """Add the peg preview draw handler to SpaceView3D."""
     _handles.append(
         bpy.types.SpaceView3D.draw_handler_add(
             draw_peg_preview, (), 'WINDOW', 'POST_VIEW'
@@ -191,7 +312,8 @@ def register():
     )
 
 
-def unregister():
+def unregister() -> None:
+    """Remove the peg preview draw handler from SpaceView3D."""
     for h in _handles:
         bpy.types.SpaceView3D.draw_handler_remove(h, 'WINDOW')
     _handles.clear()

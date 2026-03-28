@@ -1,15 +1,20 @@
+"""N-panel UI for the Plane Align tool (Mesh Tools tab)."""
+
 import bpy
 from bpy.types import Panel
 
 
 class MT_PT_PlaneAlign(Panel):
+    """Sidebar panel that exposes the Plane Align face-pick workflow."""
+
     bl_label      = "Plane Align"
     bl_idname     = "MT_PT_PlaneAlign"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category   = "Mesh Tools"
 
-    def draw(self, context):
+    def draw(self, context: bpy.types.Context) -> None:
+        """Draw source-pick box, target-pick box, and action buttons."""
         layout = self.layout
         props  = context.scene.pa_props
 
@@ -75,11 +80,13 @@ class MT_PT_PlaneAlign(Panel):
 CLASSES = [MT_PT_PlaneAlign]
 
 
-def register():
+def register() -> None:
+    """Register the Plane Align panel."""
     for cls in CLASSES:
         bpy.utils.register_class(cls)
 
 
-def unregister():
+def unregister() -> None:
+    """Unregister the Plane Align panel."""
     for cls in reversed(CLASSES):
         bpy.utils.unregister_class(cls)

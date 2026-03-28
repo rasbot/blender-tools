@@ -1,3 +1,13 @@
+"""Viewport draw callbacks for Vertex Measure overlays.
+
+Two handlers are registered:
+* ``draw_lines``  (``POST_VIEW``)  — 3-D line segments between vertex pairs
+* ``draw_labels`` (``POST_PIXEL``) — 2-D text labels at measurement midpoints
+
+Both callbacks iterate over every scene object that has ``vm_measurements``
+data so measurements from all objects are visible simultaneously.
+"""
+
 import bpy
 import blf
 import gpu
@@ -7,10 +17,24 @@ from bpy_extras.view3d_utils import location_3d_to_region_2d
 
 from .preferences import get_prefs, format_distance
 
-_handles = []
+_handles: list[object] = []
 
 
-def _get_region_and_rv3d(context):
+def _get_region_and_rv3d(
+    context: bpy.types.Context,
+) -> tuple[bpy.types.Region | None, bpy.types.RegionView3D | None]:
+    """Find the first VIEW_3D WINDOW region and its ``RegionView3D``.
+
+    Parameters
+    ----------
+    context:
+        Current Blender context.
+
+    Returns
+    -------
+    tuple[Region | None, RegionView3D | None]
+        ``(region, rv3d)`` pair, or ``(None, None)`` if no VIEW_3D is found.
+    """
     for area in context.screen.areas:
         if area.type == 'VIEW_3D':
             for region in area.regions:
@@ -19,7 +43,13 @@ def _get_region_and_rv3d(context):
     return None, None
 
 
-def draw_lines():
+def draw_lines() -> None:
+    """Draw measurement line segments for all objects in the scene (POST_VIEW).
+
+    Reads ``vm_measurements`` from every scene object each frame.  Returns
+    immediately if no measurements exist or the add-on preferences are
+    unavailable.
+    """
     context = bpy.context
     if not context or not context.scene:
         return
@@ -29,7 +59,7 @@ def draw_lines():
     except (KeyError, AttributeError):
         return
 
-    coords = []
+    coords: list[Vector] = []
     for obj in context.scene.objects:
         if not hasattr(obj, 'vm_measurements') or not obj.vm_measurements:
             continue
@@ -66,7 +96,13 @@ def draw_lines():
     gpu.state.blend_set('NONE')
 
 
-def draw_labels():
+def draw_labels() -> None:
+    """Draw measurement text labels at midpoints for all objects (POST_PIXEL).
+
+    Projects each measurement midpoint from 3-D world space to 2-D screen
+    space and renders the distance string (plus optional component breakdown)
+    using ``blf``.  Returns immediately if the viewport region is unavailable.
+    """
     context = bpy.context
     if not context or not context.scene:
         return
@@ -131,7 +167,8 @@ def draw_labels():
                 blf.draw(font_id, f"  Z: {format_distance(dz, prefs)}")
 
 
-def register():
+def register() -> None:
+    """Add the line and label draw handlers to SpaceView3D."""
     _handles.append(
         bpy.types.SpaceView3D.draw_handler_add(draw_lines, (), 'WINDOW', 'POST_VIEW')
     )
@@ -140,7 +177,8 @@ def register():
     )
 
 
-def unregister():
+def unregister() -> None:
+    """Remove all draw handlers from SpaceView3D."""
     for h in _handles:
         bpy.types.SpaceView3D.draw_handler_remove(h, 'WINDOW')
     _handles.clear()

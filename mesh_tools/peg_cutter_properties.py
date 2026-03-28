@@ -1,3 +1,5 @@
+"""Scene-level properties for the Peg Cutter tool."""
+
 import bpy
 from bpy.props import (
     FloatVectorProperty, FloatProperty, BoolProperty,
@@ -6,20 +8,34 @@ from bpy.props import (
 from bpy.types import PropertyGroup
 
 
-def _redraw(self, context):
+def _redraw(self: bpy.types.PropertyGroup, context: bpy.types.Context) -> None:
+    """Tag all VIEW_3D areas for redraw when a peg-cutter property changes."""
     for area in context.screen.areas:
         if area.type == 'VIEW_3D':
             area.tag_redraw()
 
 
 class PegCutterProps(PropertyGroup):
+    """Scene-level settings for the Peg Cutter tool.
+
+    Supports three peg shapes:
+
+    * ``CUBE``     — rectangular box defined by X/Y/Z dimensions
+    * ``CYLINDER`` — cylinder defined by diameter (``peg_size_x``) and height
+                     (``peg_size_z``) with configurable segment count
+    * ``OBJECT``   — arbitrary mesh; its world bounding box is used as the cutter
+
+    Clearance values represent the **total** size increase of the cutter
+    relative to the peg (e.g. ``clearance_xy=0.15`` means the hole is
+    0.15 mm wider and deeper than the peg, not 0.15 mm per side).
+    """
 
     peg_shape: EnumProperty(
         name="Peg Shape",
         items=[
-            ('CUBE',     "Cube",     "Rectangular box peg",     'MESH_CUBE',     0),
-            ('CYLINDER', "Cylinder", "Cylindrical peg",         'MESH_CYLINDER', 1),
-            ('OBJECT',   "Object",   "Use an existing mesh object", 'OBJECT_DATA', 2),
+            ('CUBE',     "Cube",     "Rectangular box peg",        'MESH_CUBE',     0),
+            ('CYLINDER', "Cylinder", "Cylindrical peg",            'MESH_CYLINDER', 1),
+            ('OBJECT',   "Object",   "Use an existing mesh object", 'OBJECT_DATA',  2),
         ],
         default='CUBE',
         update=_redraw,
@@ -68,7 +84,7 @@ class PegCutterProps(PropertyGroup):
         default=(0.0, 0.0, 0.0), update=_redraw,
     )
 
-    # Clearance (per side, same scene units as dimensions)
+    # Clearance (total size increase, same scene units as dimensions)
     clearance_xy: FloatProperty(
         name="XY Clearance",
         description="Total amount added to the XY size of the cutter. "
@@ -82,7 +98,7 @@ class PegCutterProps(PropertyGroup):
     )
     clearance_z: FloatProperty(
         name="Z Clearance",
-        description="Gap added to top and bottom of the cutter (per side)",
+        description="Total amount added to the Z size of the cutter",
         default=0.15, min=0.0, max=100.0, update=_redraw,
     )
 
@@ -114,12 +130,14 @@ class PegCutterProps(PropertyGroup):
     )
 
 
-def register():
+def register() -> None:
+    """Register PegCutterProps and attach it to bpy.types.Scene."""
     bpy.utils.register_class(PegCutterProps)
     bpy.types.Scene.pc_props = PointerProperty(type=PegCutterProps)
 
 
-def unregister():
+def unregister() -> None:
+    """Remove the scene attribute and unregister PegCutterProps."""
     if hasattr(bpy.types.Scene, 'pc_props'):
         del bpy.types.Scene.pc_props
     bpy.utils.unregister_class(PegCutterProps)
