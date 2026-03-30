@@ -145,7 +145,6 @@ def draw_labels() -> None:
 
             if not meas.show_components:
                 continue
-
             row = 1
             if meas.show_x:
                 dx = abs(v2_world.x - v1_world.x) * scale

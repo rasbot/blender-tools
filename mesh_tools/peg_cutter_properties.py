@@ -41,21 +41,21 @@ class PegCutterProps(PropertyGroup):
         update=_redraw,
     )
 
-    # Cube / shared dimensions — stored internally in metres, displayed in scene units
+    # Cube / shared dimensions — stored in Blender scene units
     peg_size_x: FloatProperty(
         name="Width (X)",
-        description="Peg width along X",
-        default=0.005, min=0.000001, unit='LENGTH', update=_redraw,
+        description="Peg width along X. Scene units (mm if scene is set to mm)",
+        default=5.0, min=0.001, update=_redraw,
     )
     peg_size_y: FloatProperty(
         name="Depth (Y)",
         description="Peg depth along Y",
-        default=0.005, min=0.000001, unit='LENGTH', update=_redraw,
+        default=5.0, min=0.001, update=_redraw,
     )
     peg_size_z: FloatProperty(
         name="Height (Z)",
         description="Peg height along Z",
-        default=0.01, min=0.000001, unit='LENGTH', update=_redraw,
+        default=10.0, min=0.001, update=_redraw,
     )
 
     # Cylinder only — peg_size_x reused as diameter, peg_size_z as height
@@ -76,7 +76,7 @@ class PegCutterProps(PropertyGroup):
 
     # Position / rotation (Cube and Cylinder only)
     peg_origin: FloatVectorProperty(
-        name="Origin", size=3, subtype='TRANSLATION',
+        name="Origin", size=3, subtype='XYZ',
         default=(0.0, 0.0, 0.0), update=_redraw,
     )
     peg_rotation: FloatVectorProperty(
@@ -84,12 +84,12 @@ class PegCutterProps(PropertyGroup):
         default=(0.0, 0.0, 0.0), update=_redraw,
     )
 
-    # Clearance (total size increase, stored in metres, displayed in scene units)
+    # Clearance (total size increase, same scene units as dimensions)
     clearance_xy: FloatProperty(
         name="XY Clearance",
         description="Total amount added to the XY size of the cutter. "
-                    "e.g. 0.15 mm means the hole is 0.15 mm wider and deeper than the peg",
-        default=0.00015, min=0.0, max=1.0, unit='LENGTH', update=_redraw,
+                    "0.15 means the hole is 0.15 mm wider and deeper than the peg",
+        default=0.15, min=0.0, max=100.0, update=_redraw,
     )
     use_z_clearance: BoolProperty(
         name="Separate Z Clearance",
@@ -99,7 +99,7 @@ class PegCutterProps(PropertyGroup):
     clearance_z: FloatProperty(
         name="Z Clearance",
         description="Total amount added to the Z size of the cutter",
-        default=0.00015, min=0.0, max=1.0, unit='LENGTH', update=_redraw,
+        default=0.15, min=0.0, max=100.0, update=_redraw,
     )
 
     # Target objects to cut

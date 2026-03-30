@@ -23,7 +23,7 @@ class PlaneSlicerProps(PropertyGroup):
     plane_origin: FloatVectorProperty(
         name="Origin",
         description="A point the slice plane passes through",
-        size=3, subtype='TRANSLATION',
+        size=3, subtype='XYZ',
         default=(0.0, 0.0, 0.0),
         update=_redraw,
     )
@@ -37,7 +37,7 @@ class PlaneSlicerProps(PropertyGroup):
     plane_size: FloatProperty(
         name="Display Size",
         description="Visual size of the plane preview in the viewport",
-        default=0.002, min=0.00001, max=10.0, unit='LENGTH',
+        default=2.0, min=0.01, max=10000.0,
         update=_redraw,
     )
     fill_cut: BoolProperty(
