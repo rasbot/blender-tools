@@ -136,15 +136,16 @@ def draw_labels() -> None:
             x = screen_pos.x + offset_px
             y = screen_pos.y + offset_px
 
-            # Main distance label
+            # Main distance label (computed live from current world coords)
+            scale = context.scene.unit_settings.scale_length
+            dist = (v2_world - v1_world).length * scale
             blf.color(font_id, *prefs.text_color)
             blf.position(font_id, x, y, 0)
-            blf.draw(font_id, f"{meas.name}: {format_distance(meas.distance, prefs)}")
+            blf.draw(font_id, f"{meas.name}: {format_distance(dist, prefs)}")
 
             if not meas.show_components:
                 continue
 
-            scale = context.scene.unit_settings.scale_length
             row = 1
             if meas.show_x:
                 dx = abs(v2_world.x - v1_world.x) * scale

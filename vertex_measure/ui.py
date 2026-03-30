@@ -7,6 +7,7 @@ Two panels:
 
 import bpy
 from bpy.types import Panel
+from mathutils import Vector
 
 from .preferences import get_prefs, format_distance, _draw_config
 
@@ -67,12 +68,15 @@ class VM_PT_Main(Panel):
             for i, meas in enumerate(scene_obj.vm_measurements):
                 meas_col = box.column(align=True)
 
-                # Row 1: name and distance
+                # Row 1: name and distance (computed live from current transform)
                 row = meas_col.row(align=True)
                 row.label(text=meas.name)
+                v1_w = scene_obj.matrix_world @ Vector(meas.v1_co)
+                v2_w = scene_obj.matrix_world @ Vector(meas.v2_co)
+                live_dist = (v2_w - v1_w).length * context.scene.unit_settings.scale_length
                 dist_text = (
-                    format_distance(meas.distance, prefs)
-                    if prefs else f"{meas.distance:.4f} m"
+                    format_distance(live_dist, prefs)
+                    if prefs else f"{live_dist:.4f} m"
                 )
                 row.label(text=dist_text)
 
